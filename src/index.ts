@@ -10,6 +10,6 @@ const puppeteer = require("puppeteer");
   await page.goto("https://example.com");
   await page.screenshot({ path: "example.png" });
 
-  console.log("SUCCESS");
+  console.log("SUCCESS!");
   await browser.close();
 })();
