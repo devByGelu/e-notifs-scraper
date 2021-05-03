@@ -1,0 +1,20 @@
+{
+  "name": "e-notifs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "npm run build && node build/index.js",
+    "build": "rimraf ./build && tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^15.0.1",
+    "rimraf": "^3.0.2",
+    "typescript": "^4.2.4"
+  },
+  "_id": "e-notifs@1.0.0"
+}
