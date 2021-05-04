@@ -3,9 +3,15 @@ import _ from "lodash";
 import puppeteer from "puppeteer";
 import moment from "moment";
 import { Event, IEvent } from "./Models/Event";
-const elearnUrl = "https://elearn.xu.edu.ph";
+require("dotenv").config();
 
-const userDetails = { username: "200610313", password: "Augustus_10" };
+const elearnUrl = process.env.ELEARN_URL;
+const mongoDbUri = process.env.MONGO_DB_URI;
+
+const userDetails = {
+  username: process.env.ELEARN_USERNAME,
+  password: process.env.ELEARN_PASSWORD,
+};
 const selector = {
   username: "#username",
   password: "#password",
@@ -21,9 +27,17 @@ const selector = {
     "#region-main > div:nth-child(1) > div > div > div.submissionstatustable > div.box.py-3.boxaligncenter.submissionsummarytable > table > tbody > tr:nth-child(3) > td",
   detailsColumns: ".cell",
 };
-const mongoDbUri = "mongodb://localhost/e-notifs";
 
 (async () => {
+  if (
+    !(
+      elearnUrl &&
+      mongoDbUri &&
+      userDetails["username"] &&
+      userDetails["password"]
+    )
+  )
+    throw new Error(".env is in incorrect format");
   const browser = await puppeteer.launch({
     headless: false,
     // headless: true,
