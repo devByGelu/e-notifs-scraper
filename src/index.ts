@@ -1,14 +1,28 @@
+import mongoose from "mongoose";
 import _ from "lodash";
 import puppeteer from "puppeteer";
+import moment from "moment";
+import { Event, IEvent } from "./Models/Event";
 const elearnUrl = "https://elearn.xu.edu.ph";
 
 const userDetails = { username: "200610313", password: "Augustus_10" };
 const selector = {
   username: "#username",
   password: "#password",
+  loginButton: "#loginbtn",
+  calendarButton: ".metismenu > li:nth-child(3) > a:nth-child(1)",
+  newEventButton: "button.btn-secondary:nth-child(4)",
+  days: '[data-region="day-content"]',
+  dayEvents: ".calendar_event_course",
+  eventCourseTitle:
+    "#page-header > div > div > div > div.d-flex.align-items-center > div.mr-auto > div > div > h1",
+  eventInstructions: "#intro",
+  eventDeadline:
+    "#region-main > div:nth-child(1) > div > div > div.submissionstatustable > div.box.py-3.boxaligncenter.submissionsummarytable > table > tbody > tr:nth-child(3) > td",
+  detailsColumns: ".cell",
 };
+const mongoDbUri = "mongodb://localhost/e-notifs";
 
-const hehe: number = 2;
 (async () => {
   const browser = await puppeteer.launch({
     headless: false,
@@ -17,21 +31,99 @@ const hehe: number = 2;
   });
 
   const page = await browser.newPage();
+  // Logging in
   await page.goto(elearnUrl);
   await page.waitForSelector(selector["username"]);
   await page.waitForSelector(selector["password"]);
-  await page.evaluate(() => {});
-  await page.$eval(
-    "input[name=username]",
-    (el: any) => (el.value = userDetails.username),
-    { userDetails }
+  await page.focus(selector["username"]);
+  await page.keyboard.type(userDetails["username"]);
+  await page.focus(selector["password"]);
+  await page.keyboard.type(userDetails["password"]);
+  await page.keyboard.press("Enter");
+
+  // Wait for Calendar button to appear
+  await page.waitForSelector(selector["calendarButton"]);
+  await page.click(selector["calendarButton"]);
+
+  // If New Even button appears, ready to read calendar
+  await page.waitForSelector(selector["newEventButton"]);
+
+  // Get event links
+  let links = await page.evaluate(
+    ({ selector }) => {
+      const links: string[] = [];
+      let d = document.querySelectorAll(selector["days"]);
+      d.forEach((el) => {
+        let dayEvents = el.querySelectorAll(selector["dayEvents"]);
+        //@ts-ignore
+        Array.from(dayEvents).forEach((el: Element) => {
+          // For each event
+          links.push(el.getElementsByTagName("a")[0].href);
+        });
+      });
+      return links;
+    },
+    { selector }
   );
-  await page.$eval(
-    "input[name=password]",
-    (el: any) => (el.value = userDetails.password),
-    { userDetails }
+
+  links = links.filter((l) => l.includes("assign"));
+
+  let events: IEvent[] = [];
+
+  for (const link of links) {
+    await page.goto(link);
+    await page.waitForSelector(selector["eventInstructions"]);
+
+    const courseTitle = await page.evaluate(
+      ({ selector }) =>
+        document.querySelector(selector["eventCourseTitle"]).textContent,
+      { selector }
+    );
+
+    const deadlineStr: string = await page.evaluate(
+      ({ selector }) => {
+        let dateStr = "";
+        document.querySelectorAll(selector["detailsColumns"]).forEach((el) => {
+          if (el.textContent === "Due date")
+            if (el.nextElementSibling?.textContent) {
+              dateStr = el.nextElementSibling.textContent;
+            }
+        });
+        return dateStr;
+      },
+      { selector }
+    );
+
+    const deadline = new Date(deadlineStr);
+
+    const eventId = link.split("id=")[1];
+    const pic = "";
+    events.push({
+      eventId,
+      deadline,
+      link,
+      pic,
+      courseTitle,
+    });
+  }
+
+  events = _.unionBy(events, "eventId"); // Remove duplicates
+  console.log(JSON.stringify(events, null, 2));
+
+  await mongoose.connect(mongoDbUri, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    useFindAndModify: true,
+  });
+
+  console.log("Connected to mongodb!");
+  await Promise.all(
+    _.map(events, (e) =>
+      Event.findOneAndUpdate({ eventId: e.eventId }, e, { upsert: true })
+    )
   );
-  console.log("SUCCESS!");
+  console.log("Finished updating events collection");
+
   // await page.screenshot({ path: "example.png" });
   // await browser.close();
 })();

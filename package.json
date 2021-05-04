@@ -13,6 +13,7 @@
   "license": "ISC",
   "devDependencies": {
     "@types/lodash": "^4.14.168",
+    "@types/mongoose": "^5.10.5",
     "@types/node": "^15.0.1",
     "@types/puppeteer": "^5.4.3",
     "lodash": "^4.17.21",
@@ -26,6 +27,8 @@
   },
   "_id": "e-notifs@1.0.0",
   "dependencies": {
+    "moment": "^2.29.1",
+    "mongoose": "^5.12.7",
     "puppeteer": "^9.0.0"
   }
 }
