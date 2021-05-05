@@ -54,9 +54,7 @@ const eventsRef = db.collection("events");
 
   const browser = await puppeteer.launch({
     headless: true,
-    args: ["--start-maximized"],
-    // headless: true,
-    // args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--start-maximized"],
   });
 
   const page = await browser.newPage();
