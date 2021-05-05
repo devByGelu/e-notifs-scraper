@@ -7,6 +7,7 @@ require("dotenv").config();
 type IEvent = {
   link: string;
   eventId: string;
+  eventTitle: string;
   pic: string;
   deadline: Date;
   courseTitle: string;
@@ -127,6 +128,12 @@ const eventsRef = db.collection("events");
 
     const eventId = link.split("id=")[1];
 
+    const eventTitle = (await page.evaluate(
+      () =>
+        document.querySelector("[role=main]")?.getElementsByTagName("h2")[0]
+          .textContent
+    )) as string;
+
     const detailsArea = await page.$(selector["detailsAreaSelector"]); // declare a variable with an ElementHandle
     if (detailsArea)
       await detailsArea.screenshot({ path: `images/${eventId}.png` }); // take screenshot element in puppeteer
@@ -134,6 +141,7 @@ const eventsRef = db.collection("events");
     const pic = "";
     events.push({
       eventId,
+      eventTitle,
       deadline,
       link,
       pic,
