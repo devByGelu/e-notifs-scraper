@@ -33,12 +33,14 @@ const selector = {
   eventDeadline:
     "#region-main > div:nth-child(1) > div > div > div.submissionstatustable > div.box.py-3.boxaligncenter.submissionsummarytable > table > tbody > tr:nth-child(3) > td",
   detailsColumns: ".cell",
+  detailsAreaSelector: "#region-main",
 };
 
 const serviceAccount = require("../e-notifs-firebase-adminsdk-9h46d-f5e1c444d9.json");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
+  storageBucket: process.env.GCLOUD_STORAGE_BUCKET_URL,
 });
 
 const db = admin.firestore();
@@ -49,16 +51,15 @@ const eventsRef = db.collection("events");
   if (!(elearnUrl && userDetails["username"] && userDetails["password"]))
     throw new Error(".env is in incorrect format");
 
-  console.log("Connecting to MongoDB...");
-  console.log("Connected to MongoDB!");
-
   const browser = await puppeteer.launch({
-    headless: false,
+    headless: true,
+    args: ["--start-maximized"],
     // headless: true,
     // args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
 
   const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 720 });
   // Logging in
   await page.goto(elearnUrl);
   await page.waitForSelector(selector["username"]);
@@ -125,6 +126,11 @@ const eventsRef = db.collection("events");
     const deadline = new Date(deadlineStr);
 
     const eventId = link.split("id=")[1];
+
+    const detailsArea = await page.$(selector["detailsAreaSelector"]); // declare a variable with an ElementHandle
+    if (detailsArea)
+      await detailsArea.screenshot({ path: `images/${eventId}.png` }); // take screenshot element in puppeteer
+
     const pic = "";
     events.push({
       eventId,
@@ -136,11 +142,31 @@ const eventsRef = db.collection("events");
   }
 
   events = _.unionBy(events, "eventId"); // Remove duplicates
-  console.log(JSON.stringify(events, null, 2));
 
+  await Promise.all(
+    events.map(({ eventId }, i) =>
+      uploadFile(`${eventId}.png`).then((url) => {
+        events[i].pic = url;
+      })
+    )
+  );
+  console.log("Finished uploading images");
+
+  console.log(JSON.stringify(events, null, 2));
   await Promise.all(_.map(events, (e) => eventsRef.doc(e.eventId).set(e)));
   console.log("Finished updating events collection");
 
-  // await page.screenshot({ path: "example.png" });
   await browser.close();
 })();
+
+const uploadFile = async (fileName: string): Promise<string> => {
+  let bucket = admin.storage().bucket();
+  const destinationFilename = `folder1/${fileName}`;
+  let res = await bucket.upload(`images/${fileName}`, {
+    destination: destinationFilename,
+    metadata: { contentType: "image/png" },
+    public: true,
+  });
+  let url = res["0"].metadata.mediaLink;
+  return url;
+};
