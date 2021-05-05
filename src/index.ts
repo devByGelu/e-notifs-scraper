@@ -1,17 +1,24 @@
-import mongoose from "mongoose";
 import _ from "lodash";
 import puppeteer from "puppeteer";
+import admin from "firebase-admin";
 import moment from "moment";
-import { Event, IEvent } from "./Models/Event";
 require("dotenv").config();
 
+type IEvent = {
+  link: string;
+  eventId: string;
+  pic: string;
+  deadline: Date;
+  courseTitle: string;
+};
+
 const elearnUrl = process.env.ELEARN_URL;
-const mongoDbUri = process.env.MONGO_DB_URI;
 
 const userDetails = {
   username: process.env.ELEARN_USERNAME,
   password: process.env.ELEARN_PASSWORD,
 };
+
 const selector = {
   username: "#username",
   password: "#password",
@@ -28,16 +35,23 @@ const selector = {
   detailsColumns: ".cell",
 };
 
+const serviceAccount = require("../e-notifs-firebase-adminsdk-9h46d-f5e1c444d9.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+const db = admin.firestore();
+
+const eventsRef = db.collection("events");
+
 (async () => {
-  if (
-    !(
-      elearnUrl &&
-      mongoDbUri &&
-      userDetails["username"] &&
-      userDetails["password"]
-    )
-  )
+  if (!(elearnUrl && userDetails["username"] && userDetails["password"]))
     throw new Error(".env is in incorrect format");
+
+  console.log("Connecting to MongoDB...");
+  console.log("Connected to MongoDB!");
+
   const browser = await puppeteer.launch({
     headless: false,
     // headless: true,
@@ -124,20 +138,9 @@ const selector = {
   events = _.unionBy(events, "eventId"); // Remove duplicates
   console.log(JSON.stringify(events, null, 2));
 
-  await mongoose.connect(mongoDbUri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    useFindAndModify: true,
-  });
-
-  console.log("Connected to mongodb!");
-  await Promise.all(
-    _.map(events, (e) =>
-      Event.findOneAndUpdate({ eventId: e.eventId }, e, { upsert: true })
-    )
-  );
+  await Promise.all(_.map(events, (e) => eventsRef.doc(e.eventId).set(e)));
   console.log("Finished updating events collection");
 
   // await page.screenshot({ path: "example.png" });
-  // await browser.close();
+  await browser.close();
 })();
